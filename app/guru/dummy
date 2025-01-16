@@ -1,0 +1,1143 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+
+const DaftarAbsensiSiswa = () => {
+  // State untuk filter
+  const [filterType, setFilterType] = useState(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  
+  // State untuk bulan
+  const [selectedMonth, setSelectedMonth] = useState(null);
+  const [showMonthModal, setShowMonthModal] = useState(false);
+  
+  // State untuk tanggal
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const filterTypes = [
+    { label: 'Per Hari', value: 'daily' },
+    { label: 'Per Bulan', value: 'monthly' }
+  ];
+
+  const months = [
+    { label: 'Januari', value: '01' },
+    { label: 'Februari', value: '02' },
+    { label: 'Maret', value: '03' },
+    { label: 'April', value: '04' },
+    { label: 'Mei', value: '05' },
+    { label: 'Juni', value: '06' },
+    { label: 'Juli', value: '07' },
+    { label: 'Agustus', value: '08' },
+    { label: 'September', value: '09' },
+    { label: 'Oktober', value: '10' },
+    { label: 'November', value: '11' },
+    { label: 'Desember', value: '12' }
+  ];
+
+  const generateDummyData = () => {
+    // Data siswa tetap
+    const students = [
+      { id: 1, name: 'Aditya Pratama' },
+      { id: 2, name: 'Budi Santoso' },
+      { id: 3, name: 'Citra Dewi' },
+      { id: 4, name: 'Dian Sastro' },
+      { id: 5, name: 'Eko Prasetyo' }
+    ];
+  
+    // Status yang mungkin
+    const statusOptions = ['Hadir', 'Sakit', 'Izin', 'Alpha'];
+  
+    // Generate data harian untuk Januari 2025
+    const dailyData = {};
+    const monthlyData = {
+      '01': [], '02': [], '03': [], '04': [], '05': [], '06': [],
+      '07': [], '08': [], '09': [], '10': [], '11': [], '12': []
+    };
+  
+    // Inisialisasi data bulanan
+    students.forEach(student => {
+      Object.keys(monthlyData).forEach(month => {
+        monthlyData[month].push({
+          id: student.id,
+          name: student.name,
+          hadir: 0,
+          sakit: 0,
+          izin: 0,
+          alpha: 0
+        });
+      });
+    });
+  
+    // Generate data untuk setiap bulan
+    Object.keys(monthlyData).forEach(month => {
+      const daysInMonth = 30;
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = `2025-${month}-${day.toString().padStart(2, '0')}`;
+        dailyData[date] = [];
+  
+        students.forEach(student => {
+          const randomStatus = statusOptions[Math.floor(Math.random() * 4)];
+          
+          dailyData[date].push({
+            id: student.id,
+            name: student.name,
+            status: randomStatus
+          });
+  
+          const studentMonthly = monthlyData[month].find(s => s.id === student.id);
+          switch(randomStatus) {
+            case 'Hadir':
+              studentMonthly.hadir++;
+              break;
+            case 'Sakit':
+              studentMonthly.sakit++;
+              break;
+            case 'Izin':
+              studentMonthly.izin++;
+              break;
+            case 'Alpha':
+              studentMonthly.alpha++;
+              break;
+          }
+        });
+      }
+    });
+  
+    return {
+      daily: dailyData,
+      monthly: monthlyData
+    };
+  };
+
+  // Generate data dummy
+  const absensiData = generateDummyData();
+
+  const handleDateChange = (event, date) => {
+    setShowDatePicker(false);
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+  // Custom Dropdown untuk Filter
+  const CustomFilterDropdown = () => (
+    <TouchableOpacity
+      style={styles.dropdownButton}
+      onPress={() => setShowFilterModal(true)}
+    >
+      <Text style={styles.dropdownButtonText}>
+        {filterType ? filterTypes.find(f => f.value === filterType)?.label : 'Pilih Filter'}
+      </Text>
+      <Ionicons name="chevron-down" size={24} color="#2A8579" />
+    </TouchableOpacity>
+  );
+
+  // Custom Dropdown untuk Bulan
+  const CustomMonthDropdown = () => (
+    <TouchableOpacity
+      style={styles.dropdownButton}
+      onPress={() => setShowMonthModal(true)}
+    >
+      <Text style={styles.dropdownButtonText}>
+        {selectedMonth ? months.find(m => m.value === selectedMonth)?.label : 'Pilih Bulan'}
+      </Text>
+      <Ionicons name="chevron-down" size={24} color="#2A8579" />
+    </TouchableOpacity>
+  );
+
+  const getDailyData = (date) => {
+    const formattedDate = date.toISOString().split('T')[0];
+    return absensiData.daily[formattedDate] || [];
+  };
+
+  const getMonthlyData = (month) => {
+    return absensiData.monthly[month] || [];
+  };
+
+  const renderDailyData = () => {
+    const dailyData = getDailyData(selectedDate);
+    
+    if (dailyData.length === 0) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>
+            Tidak ada data absensi untuk tanggal ini
+          </Text>
+        </View>
+      );
+    }
+
+    return dailyData.map((student) => (
+      <View key={student.id} style={styles.studentItem}>
+        <Text style={styles.studentNumber}>{student.id}</Text>
+        <Text style={styles.studentName}>{student.name}</Text>
+        <View style={[
+          styles.statusIndicator,
+          { backgroundColor: 
+            student.status === 'Hadir' ? '#4CAF50' :
+            student.status === 'Sakit' ? '#FFC107' :
+            student.status === 'Izin' ? '#2196F3' : '#F44336'
+          }
+        ]}>
+          <Text style={styles.statusText}>{student.status}</Text>
+        </View>
+      </View>
+    ));
+  };
+
+  const renderMonthlyData = () => {
+    const monthlyData = getMonthlyData(selectedMonth);
+    
+    if (monthlyData.length === 0) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>
+            Tidak ada data absensi untuk bulan ini
+          </Text>
+        </View>
+      );
+    }
+
+    return monthlyData.map((student) => (
+      <View key={student.id} style={styles.studentItem}>
+        <Text style={styles.studentNumber}>{student.id}</Text>
+        <Text style={styles.studentName}>{student.name}</Text>
+        <Text style={[styles.attendanceCount, { color: '#4CAF50' }]}>{student.hadir}</Text>
+        <Text style={[styles.attendanceCount, { color: '#F44336' }]}>{student.alpha}</Text>
+        <Text style={[styles.attendanceCount, { color: '#FFC107' }]}>{student.sakit}</Text>
+        <Text style={[styles.attendanceCount, { color: '#2196F3' }]}>{student.izin}</Text>
+      </View>
+    ));
+  };
+
+  const renderContent = () => {
+    if (!filterType) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <Ionicons 
+            name="filter-outline" 
+            size={80} 
+            color="#2A8579" 
+            style={styles.emptyStateIcon}
+          />
+          <Text style={styles.emptyStateText}>
+            Silahkan pilih filter terlebih dahulu
+          </Text>
+        </View>
+      );
+    }
+
+    if (filterType === 'daily') {
+      return (
+        <>
+          <View style={styles.datePickerContainer}>
+            <Text style={styles.searchTitle}>Silahkan memilih tanggal!</Text>
+            <TouchableOpacity 
+              style={styles.dateButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={24} color="#2A8579" />
+              <Text style={styles.dateText}>
+                {selectedDate.toLocaleDateString('id-ID')}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                onChange={handleDateChange}
+              />
+            )}
+          </View>
+          <ScrollView style={styles.studentList}>
+            <View style={styles.studentItemHeader}>
+              <Text style={styles.headerNo}>No</Text>
+              <Text style={styles.headerNama}>Nama</Text>
+              <Text style={styles.headerStatus}>Status</Text>
+            </View>
+            {renderDailyData()}
+          </ScrollView>
+        </>
+      );
+    }
+
+    if (filterType === 'monthly') {
+      return (
+        <>
+          <View style={styles.monthPickerContainer}>
+            <Text style={styles.searchTitle}>Silahkan pilih bulan!</Text>
+            <CustomMonthDropdown />
+          </View>
+          <ScrollView style={styles.studentList}>
+            <View style={styles.studentItemHeader}>
+              <Text style={styles.headerNo}>No</Text>
+              <Text style={styles.headerNama}>Nama</Text>
+              <Text style={styles.headerHadir}>H</Text>
+              <Text style={styles.headerAlpha}>A</Text>
+              <Text style={styles.headerSakit}>S</Text>
+              <Text style={styles.headerIzin}>I</Text>
+            </View>
+            {renderMonthlyData()}
+          </ScrollView>
+        </>
+      );
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Daftar Absensi Siswa</Text>
+      </View>
+
+      <View style={styles.filterContainer}>
+        <Text style={styles.searchTitle}>Silahkan memilih filter!</Text>
+        <CustomFilterDropdown />
+      </View>
+
+      {renderContent()}
+
+      {/* Modal untuk Filter */}
+      <Modal
+        visible={showFilterModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilterModal(false)}
+        >
+          <View style={styles.modalContent}>
+            {filterTypes.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={styles.modalItem}
+                onPress={() => {
+                  setFilterType(item.value);
+                  setShowFilterModal(false);
+                }}
+              >
+                <Text style={[
+                  styles.modalItemText,
+                  filterType === item.value && styles.modalItemTextSelected
+                ]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modal untuk Bulan */}
+      <Modal
+        visible={showMonthModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMonthModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMonthModal(false)}
+        >
+          <View style={styles.modalContent}>
+            {months.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={styles.modalItem}
+                onPress={() => {
+                  setSelectedMonth(item.value);
+                  setShowMonthModal(false);
+                }}
+              >
+                <Text style={[
+                  styles.modalItemText,
+                  selectedMonth === item.value && styles.modalItemTextSelected
+                ]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  headerContainer: {
+    width: '100%',
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 23,
+    paddingTop: 15,
+    paddingBottom: 20,
+    fontFamily: 'comBold',
+    color: '#2A8579',
+  },
+  filterContainer: {
+    padding: 20,
+    zIndex: 2,
+  },
+  monthPickerContainer: {
+    padding: 20,
+    paddingTop: 0,
+    zIndex: 1,
+  },
+  searchTitle: {
+    fontFamily: 'conReg',
+    fontSize: 18,
+    color: '#2A8579',
+    marginBottom: 10,
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F6F6F6',
+    padding: 12,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  dropdownButtonText: {
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    width: '80%',
+    maxHeight: '80%',
+  },
+  modalItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },    
+  modalItemText: {
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontSize: 16,
+  },
+  modalItemTextSelected: {
+    color: '#2A8579',
+    fontWeight: 'bold',
+  },
+  datePickerContainer: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F6F6F6',
+    padding: 12,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  dateText: {
+    marginLeft: 20,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontSize: 16,
+  },
+  studentList: {
+    flex: 1,
+    padding: 20,
+  },
+  studentItemHeader: {
+    flexDirection: 'row',
+    padding: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#2A8579',
+    backgroundColor: '#fff',
+  },
+  headerNo: {
+    width: 40,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+  },
+  headerNama: {
+    flex: 1,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+  },
+  headerStatus: {
+    width: 80,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  headerHadir: {
+    width: 40,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  headerAlpha: {
+    width: 40,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  headerSakit: {
+    width: 40,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  headerIzin: {
+    width: 40,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  studentItem: {
+    flexDirection: 'row',
+    padding: 10,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },
+  studentNumber: {
+    width: 40,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+  },
+  studentName: {
+    flex: 1,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+  },
+  statusIndicator: {
+    width: 80,
+    padding: 5,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  statusText: {
+    color: '#fff',
+    fontFamily: 'conReg',
+  },
+  attendanceCount: {
+    width: 40,
+    textAlign: 'center',
+    fontFamily: 'conReg',
+    color: '#2A8579',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 40,
+  },
+  emptyStateIcon: {
+    marginBottom: 20,
+  },
+  emptyStateText: {
+    fontFamily: 'conReg',
+    fontSize: 16,
+    color: '#2A8579',
+    textAlign: 'center',
+    marginBottom: 8,
+  }
+});
+
+export default DaftarAbsensiSiswa;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+
+const DaftarAbsensiSiswa = () => {
+  // State untuk filter
+  const [filterType, setFilterType] = useState(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  
+  // State untuk bulan
+  const [selectedMonth, setSelectedMonth] = useState(null);
+  const [showMonthModal, setShowMonthModal] = useState(false);
+  
+  // State untuk tanggal
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const filterTypes = [
+    { label: 'Per Hari', value: 'daily' },
+    { label: 'Per Bulan', value: 'monthly' }
+  ];
+
+  const months = [
+    { label: 'Januari', value: '01' },
+    { label: 'Februari', value: '02' },
+    { label: 'Maret', value: '03' },
+    { label: 'April', value: '04' },
+    { label: 'Mei', value: '05' },
+    { label: 'Juni', value: '06' },
+    { label: 'Juli', value: '07' },
+    { label: 'Agustus', value: '08' },
+    { label: 'September', value: '09' },
+    { label: 'Oktober', value: '10' },
+    { label: 'November', value: '11' },
+    { label: 'Desember', value: '12' }
+  ];
+
+  const generateDummyData = () => {
+    // Data untuk satu siswa
+    const studentInfo = {
+      id: 1,
+      name: 'Farrell'
+    };
+  
+    // Status yang mungkin
+    const statusOptions = ['Hadir', 'Sakit', 'Izin', 'Alpha'];
+  
+    // Generate data harian untuk setiap bulan
+    const dailyData = {};
+    const monthlyData = {};
+  
+    // Generate data untuk setiap bulan
+    for (let month = 1; month <= 12; month++) {
+      const monthStr = month.toString().padStart(2, '0');
+      monthlyData[monthStr] = [];
+      
+      // Menentukan jumlah hari dalam bulan (menggunakan 30 untuk contoh)
+      const daysInMonth = 30;
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = `2025-${monthStr}-${day.toString().padStart(2, '0')}`;
+        const status = statusOptions[Math.floor(Math.random() * 4)];
+        
+        dailyData[date] = {
+          date: day,
+          status: status
+        };
+
+        monthlyData[monthStr].push({
+          date: day,
+          status: status
+        });
+      }
+    }
+  
+    return {
+      studentInfo,
+      daily: dailyData,
+      monthly: monthlyData
+    };
+  };
+
+  // Generate data dummy
+  const absensiData = generateDummyData();
+
+  const handleDateChange = (event, date) => {
+    setShowDatePicker(false);
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+  // Custom Dropdown untuk Filter
+  const CustomFilterDropdown = () => (
+    <TouchableOpacity
+      style={styles.dropdownButton}
+      onPress={() => setShowFilterModal(true)}
+    >
+      <Text style={styles.dropdownButtonText}>
+        {filterType ? filterTypes.find(f => f.value === filterType)?.label : 'Pilih Filter'}
+      </Text>
+      <Ionicons name="chevron-down" size={24} color="#2A8579" />
+    </TouchableOpacity>
+  );
+
+  // Custom Dropdown untuk Bulan
+  const CustomMonthDropdown = () => (
+    <TouchableOpacity
+      style={styles.dropdownButton}
+      onPress={() => setShowMonthModal(true)}
+    >
+      <Text style={styles.dropdownButtonText}>
+        {selectedMonth ? months.find(m => m.value === selectedMonth)?.label : 'Pilih Bulan'}
+      </Text>
+      <Ionicons name="chevron-down" size={24} color="#2A8579" />
+    </TouchableOpacity>
+  );
+
+  const getDailyData = (date) => {
+    const formattedDate = date.toISOString().split('T')[0];
+    return absensiData.daily[formattedDate];
+  };
+
+  const getMonthlyData = (month) => {
+    return absensiData.monthly[month] || [];
+  };
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'Hadir': return '#4CAF50';
+      case 'Sakit': return '#FFC107';
+      case 'Izin': return '#2196F3';
+      case 'Alpha': return '#F44336';
+      default: return '#666666';
+    }
+  };
+
+  const renderDailyData = () => {
+    const dailyData = getDailyData(selectedDate);
+    
+    if (!dailyData) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>
+            Tidak ada data absensi untuk tanggal ini
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.studentItem}>
+        <Text style={styles.studentName}>{absensiData.studentInfo.name}</Text>
+        <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(dailyData.status) }]}>
+          <Text style={styles.statusText}>{dailyData.status}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderMonthlyData = () => {
+    const monthlyData = getMonthlyData(selectedMonth);
+    
+    if (monthlyData.length === 0) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>
+            Tidak ada data absensi untuk bulan ini
+          </Text>
+        </View>
+      );
+    }
+
+    return monthlyData.map((day) => (
+      <View key={day.date} style={styles.studentItem}>
+        <Text style={styles.dateText}>{day.date}</Text>
+        <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(day.status) }]}>
+          <Text style={styles.statusText}>{day.status}</Text>
+        </View>
+      </View>
+    ));
+  };
+
+  const renderContent = () => {
+    if (!filterType) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <Ionicons 
+            name="filter-outline" 
+            size={80} 
+            color="#2A8579" 
+            style={styles.emptyStateIcon}
+          />
+          <Text style={styles.emptyStateText}>
+            Silahkan pilih filter terlebih dahulu
+          </Text>
+        </View>
+      );
+    }
+
+    if (filterType === 'daily') {
+      return (
+        <>
+          <View style={styles.datePickerContainer}>
+            <Text style={styles.searchTitle}>Silahkan memilih tanggal!</Text>
+            <TouchableOpacity 
+              style={styles.dateButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={24} color="#2A8579" />
+              <Text style={styles.dateText}>
+                {selectedDate.toLocaleDateString('id-ID')}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                onChange={handleDateChange}
+              />
+            )}
+          </View>
+          <View style={styles.studentInfo}>
+            <Text style={styles.studentInfoText}>Nama: {absensiData.studentInfo.name}</Text>
+          </View>
+          <ScrollView style={styles.studentList}>
+            {renderDailyData()}
+          </ScrollView>
+        </>
+      );
+    }
+
+    if (filterType === 'monthly') {
+      return (
+        <>
+          <View style={styles.monthPickerContainer}>
+            <Text style={styles.searchTitle}>Silahkan pilih bulan!</Text>
+            <CustomMonthDropdown />
+          </View>
+          <View style={styles.studentInfo}>
+            <Text style={styles.studentInfoText}>Nama: {absensiData.studentInfo.name}</Text>
+          </View>
+          <ScrollView style={styles.studentList}>
+            <View style={styles.studentItemHeader}>
+              <Text style={styles.headerTanggal}>Tanggal</Text>
+              <Text style={styles.headerStatus}>Status</Text>
+            </View>
+            {renderMonthlyData()}
+          </ScrollView>
+        </>
+      );
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Daftar Absensi Siswa</Text>
+      </View>
+
+      <View style={styles.filterContainer}>
+        <Text style={styles.searchTitle}>Silahkan memilih filter!</Text>
+        <CustomFilterDropdown />
+      </View>
+
+      {renderContent()}
+
+      {/* Modal untuk Filter */}
+      <Modal
+        visible={showFilterModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilterModal(false)}
+        >
+          <View style={styles.modalContent}>
+            {filterTypes.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={styles.modalItem}
+                onPress={() => {
+                  setFilterType(item.value);
+                  setShowFilterModal(false);
+                }}
+              >
+                <Text style={[
+                  styles.modalItemText,
+                  filterType === item.value && styles.modalItemTextSelected
+                ]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modal untuk Bulan */}
+      <Modal
+        visible={showMonthModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMonthModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMonthModal(false)}
+        >
+          <View style={styles.modalContent}>
+            {months.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={styles.modalItem}
+                onPress={() => {
+                  setSelectedMonth(item.value);
+                  setShowMonthModal(false);
+                }}
+              >
+                <Text style={[
+                  styles.modalItemText,
+                  selectedMonth === item.value && styles.modalItemTextSelected
+                ]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  headerContainer: {
+    width: '100%',
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 23,
+    paddingTop: 15,
+    paddingBottom: 20,
+    fontFamily: 'comBold',
+    color: '#2A8579',
+  },
+  filterContainer: {
+    padding: 20,
+    zIndex: 2,
+  },
+  monthPickerContainer: {
+    padding: 20,
+    paddingTop: 0,
+    zIndex: 1,
+  },
+  searchTitle: {
+    fontFamily: 'conReg',
+    fontSize: 18,
+    color: '#2A8579',
+    marginBottom: 10,
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F6F6F6',
+    padding: 12,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  dropdownButtonText: {
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    width: '80%',
+    maxHeight: '80%',
+  },
+  modalItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },
+  modalItemText: {
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontSize: 16,
+  },
+  modalItemTextSelected: {
+    color: '#2A8579',
+    fontWeight: 'bold',
+  },
+  datePickerContainer: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F6F6F6',
+    padding: 12,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  dateText: {
+    marginLeft: 20,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontSize: 16,
+  },
+  studentInfo: {
+    padding: 20,
+    paddingTop: 0,
+    paddingBottom: 10,
+  },
+  studentInfoText: {
+    fontFamily: 'conReg',
+    fontSize: 18,
+    color: '#2A8579',
+  },
+  studentList: {
+    flex: 1,
+    padding: 20,
+  },
+  studentItemHeader: {
+    flexDirection: 'row',
+    padding: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#2A8579',
+    backgroundColor: '#fff',
+  },
+  headerTanggal: {
+    flex: 1,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+  },
+  headerStatus: {
+    width: 80,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  // headerHadir: {
+  //   width: 40,
+  //   fontFamily: 'conReg',
+  //   color: '#2A8579',
+  //   fontWeight: 'bold',
+  //   textAlign: 'center',
+  // },
+  // headerAlpha: {
+  //   width: 40,
+  //   fontFamily: 'conReg',
+  //   color: '#2A8579',
+  //   fontWeight: 'bold',
+  //   textAlign: 'center',
+  // },
+  // headerSakit: {
+  //   width: 40,
+  //   fontFamily: 'conReg',
+  //   color: '#2A8579',
+  //   fontWeight: 'bold',
+  //   textAlign: 'center',
+  // },
+  // headerIzin: {
+  //   width: 40,
+  //   fontFamily: 'conReg',
+  //   color: '#2A8579',
+  //   fontWeight: 'bold',
+  //   textAlign: 'center',
+  // },
+  studentItem: {
+    flexDirection: 'row',
+    padding: 10,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },
+  studentNumber: {
+    width: 40,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+  },
+  studentName: {
+    flex: 1,
+    fontFamily: 'conReg',
+    color: '#2A8579',
+  },
+  statusIndicator: {
+    width: 80,
+    padding: 5,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  statusText: {
+    color: '#fff',
+    fontFamily: 'conReg',
+  },
+  attendanceCount: {
+    width: 40,
+    textAlign: 'center',
+    fontFamily: 'conReg',
+    color: '#2A8579',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 40,
+  },
+  emptyStateIcon: {
+    marginBottom: 20,
+  },
+  emptyStateText: {
+    fontFamily: 'conReg',
+    fontSize: 16,
+    color: '#2A8579',
+    textAlign: 'center',
+    marginBottom: 8,
+  }
+});
+
+export default DaftarAbsensiSiswa;
