@@ -58,13 +58,14 @@ const GuruLayout = () => {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#2A8579',
-    height: 60,
-    paddingBottom: 5,
+    height: 65,
+    paddingBottom: 10,
     paddingTop: 5,
     borderTopWidth: 0,
   },
   tabLabel: {
     fontSize: 12,
+    // paddingBottom: 10,
     fontFamily: 'comLight',
   },
 });
