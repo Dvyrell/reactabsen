@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router'; 
 
@@ -12,7 +13,8 @@ const SettingScreen = () => {
       ]);
     }
 
-    const logout = () => {
+    const logout = async () => {
+      await AsyncStorage.clear();
       router.replace('/login');
     }
 

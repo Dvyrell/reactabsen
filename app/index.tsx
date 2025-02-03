@@ -1,9 +1,65 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
 const SplashScreen = () => {
   const router = useRouter();
+
+  const getUserToken = async () => {
+    try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (token) {
+            console.log('User Token:', token);
+            return token;
+        } else {
+            console.log('No token found');
+            return null;
+        }
+    } catch (error) {
+        console.error('Error retrieving token:', error);
+        return null;
+    }
+  };
+
+  const getUser = async () => {
+    try {
+        const userData = await AsyncStorage.getItem('userData');
+        return userData ? JSON.parse(userData) : null;
+    } catch (error) {
+        console.error('Error retrieving user data:', error);
+        return null;
+    }
+  };
+
+  const checkUserAuth = async () => {
+    try {
+        const userToken = await getUserToken();
+        if (!userToken) {
+            console.log('No token found.');
+            return;
+        }
+
+        const userData = await getUser();
+        if (!userData) {
+            console.log('User data not found.');
+            return;
+        }
+
+        if (userData.role === 'guru') {
+            router.replace('/guru/DashboardGuru');
+        } else if (userData.role === 'siswa') {
+            router.replace('/siswa/DashboardSiswa');
+        } else {
+            console.log('Unknown role, redirecting to login...');
+            router.replace('/login');
+        }
+    } catch (error) {
+        console.error('Error checking user auth:', error);
+    }
+};
+``
+checkUserAuth();
 
   return (
     <View style={styles.container}>
