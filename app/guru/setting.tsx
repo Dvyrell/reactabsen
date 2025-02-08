@@ -15,7 +15,7 @@ const SettingScreen = () => {
 
     const logout = async () => {
       await AsyncStorage.clear();
-      router.replace('/login');
+      router.replace('/');
     }
 
   return (
