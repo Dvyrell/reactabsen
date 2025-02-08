@@ -36,6 +36,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "API_HOST": "https://a324-66-96-225-165.ngrok-free.app"
     }
   }
 }

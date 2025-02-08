@@ -1,35 +1,39 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const apiHost = 'https://104e-114-5-222-198.ngrok-free.app';
-  const apiLink = apiHost + '/api/login';
+  const [loading, setLoading] = useState(false);  
+  const API_HOST = Constants.expoConfig?.extra?.API_HOST;
+  const apiLink = API_HOST + '/api/login';
   
   const router = useRouter();
 
-  const storeUserData = async (userData, userClass, userToken) => {
+  const storeUserData = async (userData:any, userToken:any) => {
       try {
-          await AsyncStorage.multiSet([
-              ['userData', JSON.stringify(userData)],  // Store user data as JSON string
-              ['userClass', JSON.stringify(userClass)], // Store class info as JSON string
-              ['userToken', userToken] // Store token as a string
-          ]);
-          console.log('User data stored successfully!');
+          if (userData && userToken) {
+            await AsyncStorage.multiSet([
+              ['userData', JSON.stringify(userData)],
+              ['userToken', userToken]
+            ]);
+
+            console.log('User data stored successfully!');
+          } else {
+            console.log('Invalid input: userData, userClass, or userToken is null or undefined');
+          }
       } catch (error) {
           console.error('Error storing user data:', error);
       }
   };
 
-  // Fungsi Login
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Email dan password harus diisi');
+      Alert.alert('Peringatan!', 'Email dan password harus diisi');
       return;
     }
 
@@ -44,23 +48,18 @@ const LoginScreen = () => {
         }
       });
 
-      // Log the response for debugging
-      // console.log('API Response:', response.data);
-
-      // Check if response.data exists and has the expected structure
       if (response.data) {
-        // Assuming the API returns { user: { role: 'guru' | 'siswa', ... } }
-        // or directly returns { role: 'guru' | 'siswa', ... }
         const userRole = response.data.users.role;
         
         console.log('Request login success.');
+        // console.log('Response Data', response.data);
         console.log('User Role:', userRole);
 
         if (userRole === 'guru') {
-            storeUserData(response.data.users, response.data.class_id, response.data.token);
+            storeUserData(response.data.users, response.data.token);
             router.replace('/guru/DashboardGuru');
         } else if (userRole === 'siswa') {
-            storeUserData(response.data.users, response.data.class_id, response.data.token);
+            storeUserData(response.data.users, response.data.token);
             router.replace('/siswa/DashboardSiswa');
         } else {
             console.log('Invalid Role Value:', userRole);
@@ -87,8 +86,8 @@ const LoginScreen = () => {
           case 500:
             errorMessage = 'Server error, silakan coba lagi nanti';
             break;
-          // default:
-            // errorMessage = `Error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
+          default:
+            errorMessage = `Error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
         }
       }
       

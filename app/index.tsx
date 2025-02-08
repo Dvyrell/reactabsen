@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -10,10 +10,8 @@ const SplashScreen = () => {
     try {
         const token = await AsyncStorage.getItem('userToken');
         if (token) {
-            console.log('User Token:', token);
             return token;
         } else {
-            console.log('No token found');
             return null;
         }
     } catch (error) {
@@ -59,7 +57,9 @@ const SplashScreen = () => {
     }
 };
 ``
-checkUserAuth();
+  useEffect(() => {
+    checkUserAuth();
+  }, []);
 
   return (
     <View style={styles.container}>
