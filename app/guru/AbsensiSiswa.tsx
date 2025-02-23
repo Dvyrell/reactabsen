@@ -3,116 +3,52 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput,
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useMemo } from 'react';
 
 const DaftarAbsensi = () => {
+  // State untuk manajemen kelas
   const [selectedKelas, setSelectedKelas] = useState('');
+  const [classData, setClassData] = useState([]);
+  
+  // State untuk pencarian
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
+  
+  // State untuk status kehadiran
   const [selectedStatus, setSelectedStatus] = useState({});
-  const [statusNotes, setStatusNotes] = useState({});  
+  const [statusNotes, setStatusNotes] = useState({});
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [currentStudentId, setCurrentStudentId] = useState(null);
-  const [tempNote, setTempNote] = useState(''); 
-  const [classData, setClassData] = useState([]);
+  const [tempNote, setTempNote] = useState('');
+  const [teacherName, setTeacherName] = useState('');
+  const getCacheKey = (teacherId) => `classDataCache_${teacherId}`;
+  
+  // State untuk data absensi dan loading
   const [isLoading, setIsLoading] = useState(true);
   const [attendanceData, setAttendanceData] = useState([]);
-  const searchInputRef = useRef(null);
-  const apiHost = 'https://104e-114-5-222-198.ngrok-free.app';
-  const apiLink = apiHost + '/api/getClasses';
-  const apiattendLink = apiHost + '/api/getClassAttendances';
-  const apiUpdateAttendance = apiHost + '/api/test';
-
-  useEffect(() => {
-    fetchClassData();
-  }, []);
-
-  useEffect(() => {
-    if (showStatusModal && currentStudentId) {
-      setTempNote(statusNotes[currentStudentId] || '');
-    }
-  }, [showStatusModal, currentStudentId]);
-
-  const fetchClassData = async () => {
-    try {
-      setIsLoading(true);
-      const response = await axios.get(apiLink);
-      
-      if (response.data.success) {
-        setClassData(response.data.data);
-      } else {
-        console.error('Failed to fetch class data:', response.data.message);
-      }
-    } catch (error) {
-      console.error('Error fetching class data:', error.response?.data || error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
   
-  const fetchAttendanceData = async (classId) => {
-    try {
-        setIsLoading(true);
+  // Refs
+  const searchInputRef = useRef(null);
+  
+  // API endpoints
+  const apiHost = 'https://a377-103-47-133-182.ngrok-free.app';
+  const apiattendLink = apiHost + '/api/getClassAttendances';
+  const apiUpdateAttendance = apiHost + '/api/updateClassAttendance';
 
-        const requestBody = {
-            class_id: classId,
-            date: new Date().toISOString().split('T')[0],
-        };
-
-        const response = await axios.post(apiattendLink, requestBody, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-            },
-            timeout: 10000,
-        });
-
-        console.log('data absen : ',JSON.stringify(response.data.data.attendances, null, 2));
-        
-        const responseData = response.data.data.attendances;
-        if (Array.isArray(responseData)) {
-            setAttendanceData(responseData);
-            
-            // Initialize selectedStatus with current attendance statuses
-            const initialStatus = {};
-            const initialNotes = {};
-            responseData.forEach(student => {
-                initialStatus[student.User_Id] = student.Attendance_Status;
-                if (student.Attendance_description) {
-                    initialNotes[student.User_Id] = student.Attendance_description;
-                }
-            });
-            setSelectedStatus(initialStatus);
-            setStatusNotes(initialNotes);
-        } else {
-            console.error('Invalid response format:', responseData);
-            Alert.alert('Error', 'Unexpected response format received from API');
-        }
-
-    } catch (error) {
-        console.error('Full Error Object:', JSON.stringify(error, null, 2));
-
-        if (error.response) {
-            console.error('Error Response Data:', error.response.data);
-            Alert.alert(
-                'API Error',
-                `Status ${error.response.status}: ${JSON.stringify(error.response.data)}`
-            );
-        } else if (error.request) {
-            console.error('No response received:', error.request);
-            Alert.alert(
-                'Network Error',
-                'No response received from server. Check your internet connection.'
-            );
-        } else {
-            console.error('Error Message:', error.message);
-            Alert.alert('Request Error', `Error: ${error.message}`);
-        }
-    } finally {
-        setIsLoading(false);
+  // Data processing
+  const kelasData = classData.map(kelas => kelas.class_name);
+  
+  const fetchWithRetry = async (url, options, maxRetries = 3) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await axios(url, options);
+      } catch (error) {
+        if (i === maxRetries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
     }
   };
-
-  const kelasData = classData.map(kelas => kelas.class_name);
 
   const filteredKelas = kelasData.filter(kelas =>
     kelas.toLowerCase().includes(searchQuery.toLowerCase())
@@ -120,40 +56,6 @@ const DaftarAbsensi = () => {
 
   const getCurrentClass = () => {
     return classData.find(kelas => kelas.class_name === selectedKelas);
-  };
-
-  const handleStatusChange = (status) => {
-    setSelectedStatus({
-      ...selectedStatus,
-      [currentStudentId]: status,
-    });
-    
-    // Update the attendanceData when status changes
-    const updatedAttendanceData = attendanceData.map(student => {
-      if (student.User_Id === currentStudentId) {
-        return {
-          ...student,
-          Attendance_Status: status,
-          Attendance_description: tempNote.trim()
-        };
-      }
-      return student;
-    });
-    
-    setAttendanceData(updatedAttendanceData);
-    console.log('Updated Attendance Data:', JSON.stringify(updatedAttendanceData, null, 2));
-    
-    if (status === 'Izin' || status === 'Sakit') {
-      setStatusNotes({
-        ...statusNotes,
-        [currentStudentId]: tempNote.trim()
-      });
-    } else {
-      const { [currentStudentId]: removedNote, ...remainingNotes } = statusNotes;
-      setStatusNotes(remainingNotes);
-    }
-    
-    setShowStatusModal(false);
   };
 
   const renderStatus = (studentId) => {
@@ -165,7 +67,46 @@ const DaftarAbsensi = () => {
     }
     return status;
   };
+  // Add this constant outside the component
+const CACHE_KEY = 'classDataCache';
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
+// Add these helper functions
+const getCachedData = async (teacherId) => {
+  const cached = await AsyncStorage.getItem(getCacheKey(teacherId));
+  if (cached) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp < CACHE_EXPIRY) {
+      return data;
+    }
+  }
+  return null;
+};
+
+const setCachedData = async (teacherId, data) => {
+  const cacheData = {
+    data,
+    timestamp: Date.now()
+  };
+  await AsyncStorage.setItem(getCacheKey(teacherId), JSON.stringify(cacheData));
+};
+
+  // Effects
+  useEffect(() => {
+    getTeacherClassesData();
+  }, []);
+
+  useEffect(() => {
+    getTeacherData();
+  }, []);
+
+  useEffect(() => {
+    if (showStatusModal && currentStudentId) {
+      setTempNote(statusNotes[currentStudentId] || '');
+    }
+  }, [showStatusModal, currentStudentId]);
+
+  // Event Handlers
   const handleKelasSelect = (kelas) => {
     setSelectedKelas(kelas);
     setSearchQuery(kelas);
@@ -191,52 +132,211 @@ const DaftarAbsensi = () => {
     setShowStatusModal(true);
   };
 
-  const submitAttendanceUpdates = async () => {
+  const handleStatusChange = (status) => {
+    setSelectedStatus({
+      ...selectedStatus,
+      [currentStudentId]: status,
+    });
+    
+    const updatedAttendanceData = attendanceData.map(student => {
+      if (student.User_Id === currentStudentId) {
+        return {
+          ...student,
+          Attendance_Status: status,
+          Attendance_description: tempNote.trim()
+        };
+      }
+      return student;
+    });
+    
+    setAttendanceData(updatedAttendanceData);
+    
+    if (status === 'Izin' || status === 'Sakit') {
+      setStatusNotes({
+        ...statusNotes,
+        [currentStudentId]: tempNote.trim()
+      });
+    } else {
+      const { [currentStudentId]: removedNote, ...remainingNotes } = statusNotes;
+      setStatusNotes(remainingNotes);
+    }
+    
+    setShowStatusModal(false);
+  };
+
+  // Main API functions
+  const getTeacherClassesData = async () => {
     try {
-      const currentClass = getCurrentClass();
-      if (!currentClass?.id) {
-        Alert.alert('Error', 'No class selected');
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (!userDataString) {
+        Alert.alert('Error', 'Data guru tidak ditemukan');
         return;
       }
+  
+      const userData = JSON.parse(userDataString);
+      const teacherId = userData.id;
+  
+      // Check cache with teacher-specific key
+      const cachedData = await getCachedData(teacherId);
+      if (cachedData) {
+        setClassData(cachedData);
+        setIsLoading(false);
+        return;
+      }
+  
+      const apiLink = `${apiHost}/api/getClasses/${teacherId}`;
+      
+      setIsLoading(true);
+      const response = await axios.get(apiLink);
+      
+      if (response.data && response.data.status === true) {
+        const classesData = response.data.data;
+        
+        if (Array.isArray(classesData)) {
+          const formattedClassData = classesData.map(item => ({
+            id: item.class_id,
+            class_name: item.class_data.name || item.class_data.class_name,
+          }));
+          
+          // Store in cache with teacher-specific key
+          await setCachedData(teacherId, formattedClassData);
+          setClassData(formattedClassData);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching class data:', error);
+      Alert.alert('Error', 'Terjadi kesalahan saat mengambil data kelas');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      // Prepare the attendance data for submission
+  const fetchAttendanceData = async (classId) => {
+    try {
+      setIsLoading(true);
+      const requestBody = {
+        class_id: classId,
+        date: new Date().toISOString().split('T')[0],
+      };
+  
+      console.log('Attempting to fetch attendance with:', {
+        url: apiattendLink,
+        requestBody
+      });
+  
+      const response = await fetchWithRetry(apiattendLink, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+        data: requestBody
+      });
+  
+      console.log('Attendance API Response:', response.data);
+      
+      if (response.data?.data?.attendances) {
+        setAttendanceData(response.data.data.attendances);
+        // Initialize status and notes
+        const initialStatus = {};
+        const initialNotes = {};
+        response.data.data.attendances.forEach(student => {
+          initialStatus[student.User_Id] = student.Attendance_Status || 'Hadir';
+          initialNotes[student.User_Id] = student.Attendance_description || '';
+        });
+        setSelectedStatus(initialStatus);
+        setStatusNotes(initialNotes);
+      } else {
+        setAttendanceData([]);
+        Alert.alert('Info', 'No attendance data found for this class');
+      }
+    } catch (error) {
+      console.log('Attendance Fetch Error:', {
+        message: error.message,
+        config: error.config,
+        response: error.response?.data
+      });
+      
+      if (!navigator.onLine) {
+        Alert.alert('Connection Error', 'Please check your internet connection');
+      } else {
+        Alert.alert('Error', 'Failed to fetch attendance data. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };  
+
+  const getTeacherData = async () => {
+    try {
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (userDataString) {
+        const userData = JSON.parse(userDataString);
+        setTeacherName(userData.name || userData.username);
+      }
+    } catch (error) {
+      console.log('Error fetching teacher data:', error);
+    }
+  };
+
+  const submitAttendanceUpdates = async () => {
+    try {
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (!userDataString) {
+        Alert.alert('Error', 'Data guru tidak ditemukan');
+        return;
+      }
+  
+      const userData = JSON.parse(userDataString);
+      const teacherId = userData.id;
+  
+      if (!teacherId) {
+        Alert.alert('Error', 'ID guru tidak valid');
+        return;
+      }
+  
       const updatedAttendances = attendanceData.map(student => ({
         attendance_id: student.Attendance_Id,
         user_id: student.User_Id,
-        status: selectedStatus[student.User_Id] || student.Attendance_Status,
-        description: statusNotes[student.User_Id] || student.Attendance_description || ''
+        status: selectedStatus[student.User_Id] || 'Hadir',
+        description: statusNotes[student.User_Id] || ''
       }));
-
-      console.log('Submitting attendance updates:', JSON.stringify(updatedAttendances, null, 2));
-
-      const response = await axios.post(apiUpdateAttendance, {
-        class_id: currentClass.id,
+  
+      const requestPayload = {
+        teacher_id: teacherId,
         attendances: updatedAttendances
-      }, {
+      };
+  
+      // Log the request payload
+      console.log('Request Payload:', JSON.stringify(requestPayload, null, 2));
+  
+      const response = await axios.patch(apiUpdateAttendance, requestPayload, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         }
       });
-
-      if (response.data.success) {
+  
+      // Log the response data
+      console.log('Response Data:', JSON.stringify(response.data, null, 2));
+  
+      if (response.data.status) {
         Alert.alert('Success', 'Attendance updated successfully');
-        // Refresh attendance data after successful update
-        fetchAttendanceData(currentClass.id);
+        fetchAttendanceData(getCurrentClass()?.id);
       } else {
         Alert.alert('Error', response.data.message || 'Failed to update attendance');
       }
-
     } catch (error) {
-      console.error('Error submitting attendance:', error);
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || 'Failed to update attendance'
-      );
+      // Log the error details
+      console.log('Error Details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      Alert.alert('Error', error.response?.data?.message || 'Failed to update attendance');
     }
   };
-
-  // console.log('attendance data : ', attendanceData);
   
   
   return (
@@ -289,9 +389,7 @@ const DaftarAbsensi = () => {
       {selectedKelas && (
         <View style={styles.selectedClassContainer}>
           <Text style={styles.selectedClassText}>Kelas: {selectedKelas}</Text>
-          <Text style={styles.selectedClassSubText}>
-            ID Kelas: {getCurrentClass()?.id}
-          </Text>
+          <Text style={styles.teacherNameText}>Guru: {teacherName}</Text>
         </View>
       )}
 
@@ -340,9 +438,8 @@ const DaftarAbsensi = () => {
                   </View>
               ))
           ) : (
-              <Text >No attendance data available.</Text>
+              <Text>No attendance data available.</Text>
           )}
-
         </ScrollView>
       )}
 
@@ -365,12 +462,12 @@ const DaftarAbsensi = () => {
           }}
         >
           <View style={styles.modalContent}>
-            {['Hadir', 'Sakit', 'Izin', 'Alpha'].map((status) => (
+            {['Hadir', 'Izin', 'Alpha'].map((status) => (
               <TouchableOpacity
                 key={status}
                 style={styles.modalItem}
                 onPress={() => {
-                  if (status === 'Izin' || status === 'Sakit') {
+                  if (status === 'Izin' ) {
                     setSelectedStatus({
                       ...selectedStatus,
                       [currentStudentId]: status,
@@ -391,8 +488,7 @@ const DaftarAbsensi = () => {
             
             {/* Conditional Note Input */}
             {selectedStatus[currentStudentId] && 
-            (selectedStatus[currentStudentId] === 'Izin' || 
-              selectedStatus[currentStudentId] === 'Sakit') && (
+            (selectedStatus[currentStudentId] === 'Izin') && (
               <View style={styles.noteContainer}>
                 <Text style={styles.noteLabel}>Keterangan:</Text>
                 <TextInput
